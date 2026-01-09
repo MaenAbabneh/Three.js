@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import GUI from 'lil-gui';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DragControls } from 'three/addons/controls/DragControls.js';
-
+import { Water } from 'three/addons/objects/Water.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 
 function main() {
 const canvas = document.querySelector('#c');
 const renderer = new THREE.WebGLRenderer({antialias: true , canvas });
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.5;
 const gui = new GUI();
 gui.show();
 
@@ -51,9 +54,18 @@ const sceneSettings = {
   shadowCameraFar: 200,
   far: 1000,
   near: 0.1,
+  // Sky and Sun settings
+  turbidity: 10,
+  rayleigh: 2,
+  mieCoefficient: 0.005,
+  mieDirectionalG: 0.8,
+  elevation: 2,
+  azimuth: 180,
+  sunIntensity: 1,
 };
 
-scene.background = new THREE.Color(sceneSettings.background);
+// Don't set a solid background color - let the sky show through
+// scene.background will be the sky itself
 
 const cubeObj = {
   boxWidth: 1,
@@ -106,137 +118,89 @@ const sceneFolder = gui.addFolder('scene');
 sceneFolder.addColor(sceneSettings, 'background').onChange((value) => {
   scene.background = new THREE.Color(value);
 });
+sceneFolder.add(sceneSettings, 'ambientIntensity', 0, 2).onChange(() => {
+  ambientLight.intensity = sceneSettings.ambientIntensity;
+});
 
-const ambientFolder = gui.addFolder('lights');
-ambientFolder.add(sceneSettings, 'ambientIntensity', 0, 5).onChange((value) => {
-  ambientLight.intensity = value;
+const skyFolder = gui.addFolder('Sky & Sun');
+skyFolder.add(sceneSettings, 'turbidity', 0.0, 20.0).onChange((value) => {
+  sky.material.uniforms['turbidity'].value = value;
 });
-ambientFolder.addColor(sceneSettings, 'ambientColor').onChange((value) => {
-  ambientLight.color.set(value);
+skyFolder.add(sceneSettings, 'rayleigh', 0.0, 4.0).onChange((value) => {
+  sky.material.uniforms['rayleigh'].value = value;
 });
-const dirFolder = gui.addFolder('directional light');
-dirFolder.add(sceneSettings, 'dirIntensity', 0, 5).onChange((value) => {
-  dirLight.intensity = value;
+skyFolder.add(sceneSettings, 'mieCoefficient', 0.0, 0.1).onChange((value) => {
+  sky.material.uniforms['mieCoefficient'].value = value;
 });
-dirFolder.addColor(sceneSettings, 'dirColor').onChange((value) => {
-  dirLight.color.set(value);
+skyFolder.add(sceneSettings, 'mieDirectionalG', 0.0, 1.0).onChange((value) => {
+  sky.material.uniforms['mieDirectionalG'].value = value;
 });
-dirFolder.add(sceneSettings, 'dirX', -10, 10).onChange((value) => {
-  dirLight.position.x = value;
-});
-dirFolder.add(sceneSettings, 'dirY', -10, 10).onChange((value) => {
-  dirLight.position.y = value;
-});
-dirFolder.add(sceneSettings, 'dirZ', -10, 10).onChange((value) => {
-  dirLight.position.z = value;
-});
-const pointFolder = gui.addFolder('point light');
-pointFolder.add(sceneSettings, 'pointIntensity', 0, 10).onChange((value) => {
-  pointLight.intensity = value;
-});
-pointFolder.addColor(sceneSettings, 'pointColor').onChange((value) => {
-  pointLight.color.set(value);
-});
-pointFolder.add(sceneSettings, 'pointX', -10, 10).onChange((value) => {
-  pointLight.position.x = value;
-});
-pointFolder.add(sceneSettings, 'pointY', -10, 10).onChange((value) => {
-  pointLight.position.y = value;
-});
-pointFolder.add(sceneSettings, 'pointZ', -10, 10).onChange((value) => {
-  pointLight.position.z = value;
-});
-const spotFolder = gui.addFolder('spot light');
-spotFolder.add(sceneSettings, 'spotIntensity', 0, 10).onChange((value) => {
-  spotLight.intensity = value;
-});
-spotFolder.add(sceneSettings, 'spotX', -10, 10).onChange((value) => {
-  spotLight.position.x = value;
-});
-spotFolder.add(sceneSettings, 'spotY', -10, 10).onChange((value) => {
-  spotLight.position.y = value;
-});
-spotFolder.add(sceneSettings, 'spotZ', -10, 10).onChange((value) => {
-  spotLight.position.z = value;
-});
-spotFolder.addColor(sceneSettings, 'spotColor').onChange((value) => {
-  spotLight.color.set(value);
-});
-spotFolder.add(sceneSettings, 'angle', 0, Math.PI / 2).onChange((value) => {
-  spotLight.angle = value;
-});
-spotFolder.add(sceneSettings, 'penumbra', 0, 1).onChange((value) => {
-  spotLight.penumbra = value;
-});
-spotFolder.add(sceneSettings, 'decay', 1, 5).onChange((value) => {
-  spotLight.decay = value;
-});
-spotFolder.add(sceneSettings, 'distance', 0, 100).onChange((value) => {
-  spotLight.distance = value;
-});
-spotFolder.add(sceneSettings, 'castShadow').onChange((value) => {
-  spotLight.castShadow = value;
-});
-spotFolder.add(sceneSettings, 'mapSizeWidth', 0, 2048).step(1).onChange((value) => {
-  spotLight.shadow.mapSize.width = value;
-  spotLight.shadow.map.dispose();
-  spotLight.shadow.map = null;
-});
-spotFolder.add(sceneSettings, 'mapSizeHeight', 0, 2048).step(1).onChange((value) => {
-  spotLight.shadow.mapSize.height = value;
-  spotLight.shadow.map.dispose();
-  spotLight.shadow.map = null;
-});
-spotFolder.add(sceneSettings, 'shadowCameraNear', 0.1, 50).onChange((value) => {
-  spotLight.shadow.camera.near = value;
-  spotLight.shadow.camera.updateProjectionMatrix();
-});
-spotFolder.add(sceneSettings, 'shadowCameraFar', 50, 500).onChange((value) => {
-  spotLight.shadow.camera.far = value;
-  spotLight.shadow.camera.updateProjectionMatrix();
-});
-spotFolder.add(sceneSettings, 'far', 0.1, 1000).onChange((value) => {
-  scene.fog.far = value;
-});
-spotFolder.add(sceneSettings, 'near', 0.1, 100).onChange((value) => {
-  scene.fog.near = value;
+skyFolder.add(sceneSettings, 'elevation', 0, 90).onChange(updateSun);
+skyFolder.add(sceneSettings, 'azimuth', -180, 180).onChange(updateSun);
+skyFolder.add(sceneSettings, 'sunIntensity', 0, 3).onChange((value) => {
+  sunLight.intensity = value;
 });
 
 
+// Geometries
 const cube = new THREE.BoxGeometry(cubeObj.boxWidth, cubeObj.boxHeight, cubeObj.boxDepth);
 const sphere = new THREE.SphereGeometry(sphereObj.radius, sphereObj.widthSegments, sphereObj.heightSegments);
 const plane = new THREE.PlaneGeometry(planeObj.width, planeObj.height , planeObj.widthSegments , planeObj.heightSegments);
 
+// Water setup
+const textureLoader = new THREE.TextureLoader();
+textureLoader.setCrossOrigin('anonymous');
+const waterGeometry = new THREE.PlaneGeometry(10, 10, 256, 256);
+const water = new Water(waterGeometry, {
+  textureWidth: 512,
+  textureHeight: 512,
+  waterNormals: textureLoader.load('https://threejs.org/examples/textures/waternormals.jpg', (texture) => {
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  }),
+  alpha: 1.0,
+  sunDirection: new THREE.Vector3(),
+  sunColor: 0xffffff,
+  waterColor: 0x001e0f,
+  distortionScale: 3.7,
+  fog: scene.fog !== undefined
+});
 
+// Skybox setup
+const sky = new Sky();
+sky.scale.setScalar(10000);
+scene.add(sky);
+
+const skyUniforms = sky.material.uniforms;
+skyUniforms['turbidity'].value = sceneSettings.turbidity;
+skyUniforms['rayleigh'].value = sceneSettings.rayleigh;
+skyUniforms['mieCoefficient'].value = sceneSettings.mieCoefficient;
+skyUniforms['mieDirectionalG'].value = sceneSettings.mieDirectionalG;
+
+// Sun position
+const sun = new THREE.Vector3();
+
+// Sun light (directional light as sun)
+const sunLight = new THREE.DirectionalLight(0xffffff, sceneSettings.sunIntensity);
+sunLight.castShadow = true;
+scene.add(sunLight);
+
+function updateSun() {
+  const phi = THREE.MathUtils.degToRad(90 - sceneSettings.elevation);
+  const theta = THREE.MathUtils.degToRad(sceneSettings.azimuth);
+  sun.setFromSphericalCoords(1, phi, theta);
+  sky.material.uniforms['sunPosition'].value.copy(sun);
+  water.material.uniforms['sunDirection'].value.copy(sun).normalize();
+  sunLight.position.set(sun.x * 100, sun.y * 100, sun.z * 100);
+}
+
+updateSun();
+
+// Meshes
 const cubeMesh = new THREE.Mesh(cube, new THREE.MeshStandardMaterial({ color: cubeObj.color }));
 const sphereMesh = new THREE.Mesh(sphere, new THREE.MeshStandardMaterial({ color: sphereObj.color }));
 const planeMesh = new THREE.Mesh(plane, new THREE.MeshStandardMaterial({ color: planeObj.color , wireframe: true }));
 
-const ambientLight = new THREE.AmbientLight(sceneSettings.ambientColor, sceneSettings.ambientIntensity);
-scene.add(ambientLight);
-
-const dirLight = new THREE.DirectionalLight(sceneSettings.dirColor, sceneSettings.dirIntensity);
-dirLight.position.set(sceneSettings.dirX, sceneSettings.dirY, sceneSettings.dirZ);
-scene.add(dirLight);
-
-const pointLight = new THREE.PointLight(sceneSettings.pointColor, sceneSettings.pointIntensity, 100);
-pointLight.position.set(sceneSettings.pointX, sceneSettings.pointY, sceneSettings.pointZ);
-scene.add(pointLight);
-
-const spotLight = new THREE.SpotLight(sceneSettings.spotColor, sceneSettings.spotIntensity, 100);
-spotLight.position.set(sceneSettings.spotX, sceneSettings.spotY, sceneSettings.spotZ);
-spotLight.angle = sceneSettings.angle;
-spotLight.penumbra = sceneSettings.penumbra;
-spotLight.decay = sceneSettings.decay;
-spotLight.distance = sceneSettings.distance;
-spotLight.castShadow = sceneSettings.castShadow;
-spotLight.shadow.mapSize.width = sceneSettings.mapSizeWidth;
-spotLight.shadow.mapSize.height = sceneSettings.mapSizeHeight;
-spotLight.shadow.camera.near = sceneSettings.shadowCameraNear;
-spotLight.shadow.camera.far = sceneSettings.shadowCameraFar;
-spotLight.shadow.camera.updateProjectionMatrix();
-scene.add(spotLight);
-
+// Function to update geometries
 function updateGeometries() {
   // Update cube geometry
   cubeMesh.geometry.dispose();
@@ -249,13 +213,23 @@ function updateGeometries() {
   planeMesh.geometry = new THREE.PlaneGeometry(planeObj.width, planeObj.height , planeObj.widthSegments , planeObj.heightSegments);
 }
 
+const ambientLight = new THREE.AmbientLight(sceneSettings.ambientColor, sceneSettings.ambientIntensity);
+scene.add(ambientLight);
+
 // add 
 scene.add(sphereMesh , cubeMesh, planeMesh);
+// add water surface and align as ground plane
+water.rotation.x = -Math.PI / 2;
+water.position.y = -0.5;
+scene.add(water);
+// hide helper plane to avoid visual overlap
+planeMesh.visible = false;
 cubeMesh.position.set(-1, 0, 0);
 sphereMesh.position.set(1, 0, 0);
 planeMesh.rotation.x = Math.PI / 2;
 planeMesh.position.y = -0.5;
 
+// Resize function
 function resizeRendererToDisplaySize(renderer) {
   const canvas = renderer.domElement;
   const width = canvas.clientWidth;
@@ -293,6 +267,11 @@ function render() {
     camera.aspect = canvas.clientWidth / canvas.clientHeight;
     camera.updateProjectionMatrix();
   }
+
+    // animate water time uniform for waves
+    if (water && water.material && water.material.uniforms && water.material.uniforms['time']) {
+      water.material.uniforms['time'].value += 1.0 / 60.0;
+    }
 
     controls.update(); // Update controls for damping
 
