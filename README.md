@@ -8,6 +8,11 @@ A minimal Three.js scene rendered via a full-viewport canvas that displays three
 - Responsive renderer sizing that keeps the camera aspect correct on resize
 - Simple Vite scripts for dev server, build, and preview
 
+## New Features
+- Added a dynamic skybox with adjustable turbidity, rayleigh, and mie coefficients.
+- Implemented a directional light to simulate sunlight with adjustable elevation and azimuth.
+- Enhanced water surface reflections based on the sun's position.
+
 ## Prerequisites
 - Node.js 18+ (LTS recommended)
 - npm (comes with Node.js)
